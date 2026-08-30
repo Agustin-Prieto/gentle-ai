@@ -1,6 +1,42 @@
 package system
 
-import "testing"
+import (
+	"fmt"
+	"path/filepath"
+	"testing"
+)
+
+func TestDetectNpmWritableRequiresWritablePrefix(t *testing.T) {
+	writable := t.TempDir()
+	orig := npmConfigPrefix
+	t.Cleanup(func() { npmConfigPrefix = orig })
+	npmConfigPrefix = func() ([]byte, error) { return []byte(writable + "\n"), nil }
+	if !detectNpmWritable(t.TempDir()) {
+		t.Fatal("detectNpmWritable() = false, want true for writable npm prefix")
+	}
+
+	missing := filepath.Join(t.TempDir(), "missing")
+	npmConfigPrefix = func() ([]byte, error) { return []byte(missing), nil }
+	if detectNpmWritable(t.TempDir()) {
+		t.Fatal("detectNpmWritable() = true, want false for unusable npm prefix")
+	}
+
+	outsideHome := t.TempDir()
+	home := t.TempDir()
+	npmConfigPrefix = func() ([]byte, error) { return []byte(outsideHome), nil }
+	if !detectNpmWritable(home) {
+		t.Fatal("detectNpmWritable() = false, want true when prefix is writable outside home")
+	}
+}
+
+func TestDetectNpmWritableCommandFailure(t *testing.T) {
+	orig := npmConfigPrefix
+	t.Cleanup(func() { npmConfigPrefix = orig })
+	npmConfigPrefix = func() ([]byte, error) { return nil, fmt.Errorf("npm unavailable") }
+	if detectNpmWritable(t.TempDir()) {
+		t.Fatal("detectNpmWritable() = true, want false after npm probe failure")
+	}
+}
 
 func TestIsSupportedOS(t *testing.T) {
 	tests := []struct {
