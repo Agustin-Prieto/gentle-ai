@@ -138,16 +138,6 @@ func InstallCommandsForDep(name string, profile PlatformProfile) [][]string {
 	return withoutSudo(profile, commands)
 }
 
-// NpmInstallCommands returns the display-only command for a global npm install.
-// Android/Termux has no sudo privilege path, regardless of its package manager.
-func NpmInstallCommands(profile PlatformProfile, packageName string) [][]string {
-	commands := [][]string{{"npm", "install", "-g", "--ignore-scripts", packageName}}
-	if profile.OS == "linux" && !profile.NpmWritable {
-		commands[0] = append([]string{"sudo"}, commands[0]...)
-	}
-	return commands
-}
-
 func withoutSudo(profile PlatformProfile, commands [][]string) [][]string {
 	if profile.OS != "android" {
 		return commands

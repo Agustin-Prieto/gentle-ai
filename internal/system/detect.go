@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime"
 	"strings"
 )
@@ -117,7 +118,11 @@ func detectNpmWritable(_ string) bool {
 		return false
 	}
 
-	probe, err := os.CreateTemp(prefix, ".gentle-ai-npm-writable-*")
+	return writableDirectory(filepath.Join(prefix, "lib", "node_modules")) && writableDirectory(filepath.Join(prefix, "bin"))
+}
+
+func writableDirectory(path string) bool {
+	probe, err := os.CreateTemp(path, ".gentle-ai-npm-writable-*")
 	if err != nil {
 		return false
 	}

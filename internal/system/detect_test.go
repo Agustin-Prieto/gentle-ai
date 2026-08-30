@@ -2,17 +2,18 @@ package system
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 	"testing"
 )
 
-func TestDetectNpmWritableRequiresWritablePrefix(t *testing.T) {
-	writable := t.TempDir()
+func TestDetectNpmWritableRequiresWritableGlobalInstallTargets(t *testing.T) {
+	writable := writableNpmPrefix(t)
 	orig := npmConfigPrefix
 	t.Cleanup(func() { npmConfigPrefix = orig })
 	npmConfigPrefix = func() ([]byte, error) { return []byte(writable + "\n"), nil }
 	if !detectNpmWritable(t.TempDir()) {
-		t.Fatal("detectNpmWritable() = false, want true for writable npm prefix")
+		t.Fatal("detectNpmWritable() = false, want true for writable npm install targets")
 	}
 
 	missing := filepath.Join(t.TempDir(), "missing")
@@ -21,12 +22,39 @@ func TestDetectNpmWritableRequiresWritablePrefix(t *testing.T) {
 		t.Fatal("detectNpmWritable() = true, want false for unusable npm prefix")
 	}
 
-	outsideHome := t.TempDir()
+	outsideHome := writableNpmPrefix(t)
 	home := t.TempDir()
 	npmConfigPrefix = func() ([]byte, error) { return []byte(outsideHome), nil }
 	if !detectNpmWritable(home) {
-		t.Fatal("detectNpmWritable() = false, want true when prefix is writable outside home")
+		t.Fatal("detectNpmWritable() = false, want true when npm install targets are writable outside home")
 	}
+}
+
+func TestDetectNpmWritableRequiresBinAndNodeModulesTargets(t *testing.T) {
+	prefix := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(prefix, "lib", "node_modules"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(prefix, "bin"), []byte("not a directory"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	orig := npmConfigPrefix
+	t.Cleanup(func() { npmConfigPrefix = orig })
+	npmConfigPrefix = func() ([]byte, error) { return []byte(prefix), nil }
+	if detectNpmWritable(t.TempDir()) {
+		t.Fatal("detectNpmWritable() = true, want false when npm bin target is not writable")
+	}
+}
+
+func writableNpmPrefix(t *testing.T) string {
+	t.Helper()
+	prefix := t.TempDir()
+	for _, dir := range []string{filepath.Join(prefix, "lib", "node_modules"), filepath.Join(prefix, "bin")} {
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	return prefix
 }
 
 func TestDetectNpmWritableCommandFailure(t *testing.T) {

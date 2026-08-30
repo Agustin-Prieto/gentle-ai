@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 
 	"github.com/gentleman-programming/gentle-ai/v2/internal/agents/capabilitymanifest"
+	"github.com/gentleman-programming/gentle-ai/v2/internal/components/installcommands"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/model"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/system"
 )
@@ -76,7 +77,7 @@ func (a *Adapter) CapabilityManifest() capabilitymanifest.AgentCapabilityManifes
 // advises "latest" rather than a pin: a human reads and runs this, and a
 // hardcoded version goes stale the moment a newer Qwen Code ships.
 func (a *Adapter) InstallCommand(profile system.PlatformProfile) ([][]string, error) {
-	return system.NpmInstallCommands(profile, "@qwen-code/qwen-code@latest"), nil
+	return installcommands.NpmInstallCommands(profile, "@qwen-code/qwen-code@latest"), nil
 }
 
 // --- Config paths ---

@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/gentleman-programming/gentle-ai/v2/internal/components/installcommands"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/model"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/system"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/versions"
@@ -66,7 +67,7 @@ func (profileResolver) ResolveAgentInstall(profile system.PlatformProfile, agent
 // hardcoded version goes wrong the moment a newer release ships (the same
 // drift this shape fixed for Codex's GPT-5.6 update advice).
 func resolveClaudeCodeInstall(profile system.PlatformProfile) CommandSequence {
-	return system.NpmInstallCommands(profile, "@anthropic-ai/claude-code@latest")
+	return installcommands.NpmInstallCommands(profile, "@anthropic-ai/claude-code@latest")
 }
 
 // resolveKilocodeInstall returns the npm install command sequence gentle-ai
@@ -74,7 +75,7 @@ func resolveClaudeCodeInstall(profile system.PlatformProfile) CommandSequence {
 // Linux with system npm, sudo is required. With nvm/fnm/volta, it is not.
 // On Windows and macOS, sudo is never needed.
 func resolveKilocodeInstall(profile system.PlatformProfile) CommandSequence {
-	return system.NpmInstallCommands(profile, "@kilocode/cli@latest")
+	return installcommands.NpmInstallCommands(profile, "@kilocode/cli@latest")
 }
 
 // resolveKimiInstall returns the official Kimi install command sequence.
@@ -266,7 +267,7 @@ func resolveOpenCodeInstall(profile system.PlatformProfile) (CommandSequence, er
 		// (issue #2499). The gate keeps a probe-rejected Linux profile
 		// (empty PackageManager) on the unsupported arm.
 		if (profile.OS == "linux" || profile.OS == "android") && profile.PackageManager != "" {
-			return system.NpmInstallCommands(profile, pkg), nil
+			return installcommands.NpmInstallCommands(profile, pkg), nil
 		}
 		return nil, fmt.Errorf(
 			"unsupported platform for opencode: os=%q distro=%q pm=%q",
