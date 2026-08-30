@@ -753,7 +753,7 @@ var removeRetiredOutputStyle = removeFileAtomic
 
 // SetRetiredOutputStyleRemoverForTest swaps the retired-style removal seam and
 // returns a function that restores its previous implementation.
-func SetRetiredOutputStyleRemoverForTest(remover func(string) (bool, error)) func() {
+var SetRetiredOutputStyleRemoverForTest = func(remover func(string) (bool, error)) func() {
 	previous := removeRetiredOutputStyle
 	if remover == nil {
 		remover = removeFileAtomic
