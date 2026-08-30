@@ -1822,8 +1822,12 @@ func ensureClaudeSkillRegistryHook(settingsPath string) (bool, error) {
 			return false, err
 		}
 		out = append(out, '\n')
+		previous, readErr := os.ReadFile(settingsPath)
 		wr, err := filemerge.WriteFileAtomic(settingsPath, out, 0o644)
 		if err != nil {
+			if readErr == nil {
+				_ = os.WriteFile(settingsPath, previous, 0o644)
+			}
 			return false, err
 		}
 		return wr.Changed, nil
@@ -1874,6 +1878,9 @@ func reconcileClaudeSkillRegistryHook(hooksMap map[string]any, command string) (
 		claudeSkillRegistryHookCommandPOSIX:   true,
 		claudeSkillRegistryHookCommandWindows: true,
 	}
+	found := false
+	changed := false
+	kept := false
 	for _, key := range []string{"UserPromptSubmit", "SessionStart"} {
 		hookEntries, ok := hooksMap[key].([]any)
 		if !ok {
@@ -1888,24 +1895,36 @@ func reconcileClaudeSkillRegistryHook(hooksMap map[string]any, command string) (
 			if !ok {
 				continue
 			}
+			reconciledHooks := hooks[:0]
 			for _, hook := range hooks {
 				hookMap, ok := hook.(map[string]any)
 				if !ok {
+					reconciledHooks = append(reconciledHooks, hook)
 					continue
 				}
 				existing, _ := hookMap["command"].(string)
 				if !managed[existing] {
+					reconciledHooks = append(reconciledHooks, hook)
 					continue
 				}
-				if existing == command {
-					return true, false
+				found = true
+				if !kept {
+					if existing != command {
+						hookMap["command"] = command
+						changed = true
+					}
+					reconciledHooks = append(reconciledHooks, hookMap)
+					kept = true
+					continue
 				}
-				hookMap["command"] = command
-				return true, true
+				changed = true
+			}
+			if len(reconciledHooks) != len(hooks) {
+				itemMap["hooks"] = reconciledHooks
 			}
 		}
 	}
-	return false, false
+	return found, changed
 }
 
 func claudeHookExists(root map[string]any, command string) bool {

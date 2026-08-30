@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"runtime"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -6975,6 +6976,35 @@ func TestClaudeSkillRegistryHookCommandUsesPowerShellSafeWindowsSyntax(t *testin
 	posix := claudeSkillRegistryHookCommand("linux")
 	if !strings.Contains(posix, `${CLAUDE_PROJECT_DIR:-$PWD}`) || !strings.Contains(posix, `|| true`) {
 		t.Fatalf("POSIX hook command lost existing fallback/error suppression syntax: %s", posix)
+	}
+}
+
+func TestReconcileClaudeSkillRegistryHookRemovesDuplicateManagedCommands(t *testing.T) {
+	hooksMap := map[string]any{
+		"UserPromptSubmit": []any{
+			map[string]any{"matcher": "", "hooks": []any{
+				map[string]any{"type": "command", "command": claudeSkillRegistryHookCommandWindows},
+				map[string]any{"type": "command", "command": claudeSkillRegistryHookCommandPOSIX},
+				map[string]any{"type": "command", "command": "echo keep"},
+			}},
+		},
+	}
+
+	found, changed := reconcileClaudeSkillRegistryHook(hooksMap, claudeSkillRegistryHookCommandWindows)
+	if !found || !changed {
+		t.Fatalf("reconcile found=%v changed=%v, want true true", found, changed)
+	}
+	entries := hooksMap["UserPromptSubmit"].([]any)
+	hooks := entries[0].(map[string]any)["hooks"].([]any)
+	commands := []string{}
+	for _, hook := range hooks {
+		commands = append(commands, hook.(map[string]any)["command"].(string))
+	}
+	if strings.Count(strings.Join(commands, "\n"), "gentle-ai skill-registry refresh") != 1 {
+		t.Fatalf("managed hook was not deduped: %#v", commands)
+	}
+	if !slices.Contains(commands, claudeSkillRegistryHookCommandWindows) || !slices.Contains(commands, "echo keep") {
+		t.Fatalf("reconcile commands = %#v", commands)
 	}
 }
 
