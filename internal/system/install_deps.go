@@ -135,16 +135,11 @@ func InstallCommandsForDep(name string, profile PlatformProfile) [][]string {
 	default:
 		return nil
 	}
-	return withoutSudo(profile, commands)
-}
-
-func withoutSudo(profile PlatformProfile, commands [][]string) [][]string {
-	if profile.OS != "android" {
-		return commands
-	}
-	for i, command := range commands {
-		if len(command) > 0 && command[0] == "sudo" {
-			commands[i] = append([]string(nil), command[1:]...)
+	if profile.OS == "android" {
+		for i, command := range commands {
+			if len(command) > 0 && command[0] == "sudo" {
+				commands[i] = append([]string(nil), command[1:]...)
+			}
 		}
 	}
 	return commands
