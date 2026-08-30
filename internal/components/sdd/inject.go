@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"strings"
 
 	"github.com/gentleman-programming/gentle-ai/v2/internal/agents"
@@ -1801,7 +1802,7 @@ func ensureClaudeSkillRegistryHook(settingsPath string) (bool, error) {
 		return false, err
 	}
 
-	const command = `gentle-ai skill-registry refresh --quiet --no-gitignore --cwd "${CLAUDE_PROJECT_DIR:-$PWD}" || true`
+	command := claudeSkillRegistryHookCommand(runtime.GOOS)
 	if claudeHookExists(root, command) {
 		return false, nil
 	}
@@ -1841,6 +1842,13 @@ func ensureClaudeSkillRegistryHook(settingsPath string) (bool, error) {
 		return false, err
 	}
 	return wr.Changed, nil
+}
+
+func claudeSkillRegistryHookCommand(goos string) string {
+	if goos == "windows" {
+		return `if ($env:CLAUDE_PROJECT_DIR) { $d = $env:CLAUDE_PROJECT_DIR } else { $d = $PWD }; gentle-ai skill-registry refresh --quiet --no-gitignore --cwd "$d"; exit 0`
+	}
+	return `gentle-ai skill-registry refresh --quiet --no-gitignore --cwd "${CLAUDE_PROJECT_DIR:-$PWD}" || true`
 }
 
 func claudeHookExists(root map[string]any, command string) bool {
