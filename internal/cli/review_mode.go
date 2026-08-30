@@ -279,14 +279,19 @@ func reviewModeUnsafePathRefusal(err error) error {
 	return nil
 }
 
+type reviewModeRepositoryRequiredError struct{ Cause error }
+
+func (err *reviewModeRepositoryRequiredError) Unwrap() error { return err.Cause }
+
+func (err *reviewModeRepositoryRequiredError) Error() string {
+	return "clone-local review mode requires a Git repository; rerun the original command with --cwd pointing at the intended repository, or use `gentle-ai review mode enable --scope global` or `gentle-ai review mode disable --scope global` for machine-wide state"
+}
+
 func reviewModeRepositoryRequiredRefusal(err error) error {
 	if !reviewtransaction.ReviewRootResolutionReportsNoRepository(err) {
 		return nil
 	}
-	return fmt.Errorf(
-		"clone-local review mode requires a Git repository; rerun with --cwd pointing at the intended repository, or use --scope global for machine-wide state: %w",
-		err,
-	)
+	return &reviewModeRepositoryRequiredError{Cause: err}
 }
 
 func reviewModeCommandsByVerb(commands []string, verb string) []string {
