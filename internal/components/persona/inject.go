@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	"github.com/gentleman-programming/gentle-ai/v2/internal/agents"
 	"github.com/gentleman-programming/gentle-ai/v2/internal/assets"
@@ -438,7 +439,10 @@ func injectInternal(homeDir string, adapter agents.Adapter, persona model.Person
 		}
 
 		for _, retiredPath := range stylePaths.Remove {
-			styleRemoved, err := removeRetiredOutputStyle(retiredPath)
+			removeRetiredOutputStyleMu.RLock()
+			remover := removeRetiredOutputStyle
+			removeRetiredOutputStyleMu.RUnlock()
+			styleRemoved, err := remover(retiredPath)
 			if err != nil {
 				return InjectionResult{}, fmt.Errorf("remove retired output style: %w", &RetiredOutputStyleRemovalError{Path: retiredPath, Cause: err})
 			}
@@ -749,17 +753,26 @@ func (err *RetiredOutputStyleRemovalError) Unwrap() error { return err.Cause }
 // removeRetiredOutputStyle is the narrow removal seam used by persona injection.
 // The setter is exported so CLI pipeline tests can force a post-write removal
 // failure and prove that the outer transaction restores every snapshotted file.
-var removeRetiredOutputStyle = removeFileAtomic
+var (
+	removeRetiredOutputStyleMu sync.RWMutex
+	removeRetiredOutputStyle   = removeFileAtomic
+)
 
 // SetRetiredOutputStyleRemoverForTest swaps the retired-style removal seam and
 // returns a function that restores its previous implementation.
 var SetRetiredOutputStyleRemoverForTest = func(remover func(string) (bool, error)) func() {
-	previous := removeRetiredOutputStyle
 	if remover == nil {
 		remover = removeFileAtomic
 	}
+	removeRetiredOutputStyleMu.Lock()
+	previous := removeRetiredOutputStyle
 	removeRetiredOutputStyle = remover
-	return func() { removeRetiredOutputStyle = previous }
+	removeRetiredOutputStyleMu.Unlock()
+	return func() {
+		removeRetiredOutputStyleMu.Lock()
+		removeRetiredOutputStyle = previous
+		removeRetiredOutputStyleMu.Unlock()
+	}
 }
 
 // removeFileAtomic removes path if it exists. Returns true when the file was

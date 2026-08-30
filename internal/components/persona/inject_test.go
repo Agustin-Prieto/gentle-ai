@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/gentleman-programming/gentle-ai/v2/internal/agents"
@@ -315,6 +316,36 @@ func TestInjectClaudeNeutralWritesResidualPersonaWithoutRegionalLanguage(t *test
 	if strings.Contains(text, "Rioplatense") {
 		t.Fatal("Neutral persona should not contain Rioplatense language")
 	}
+}
+
+func TestInjectRetiredOutputStyleRemoverCanBeUpdatedConcurrently(t *testing.T) {
+	const injectors = 8
+
+	homes := make([]string, injectors)
+	for i := range homes {
+		homes[i] = t.TempDir()
+	}
+
+	var wg sync.WaitGroup
+	wg.Add(1 + injectors)
+	go func() {
+		defer wg.Done()
+		for i := 0; i < 1000; i++ {
+			restore := SetRetiredOutputStyleRemoverForTest(func(string) (bool, error) {
+				return false, nil
+			})
+			restore()
+		}
+	}()
+	for _, home := range homes {
+		go func() {
+			defer wg.Done()
+			if _, err := Inject(home, claudeAdapter(), model.PersonaNeutral); err != nil {
+				t.Errorf("Inject() error = %v", err)
+			}
+		}()
+	}
+	wg.Wait()
 }
 
 func TestInjectNeutralReportsRetiredOutputStyleRemovalFailure(t *testing.T) {
