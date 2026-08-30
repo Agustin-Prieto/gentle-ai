@@ -2,6 +2,7 @@ package persona
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -313,6 +314,38 @@ func TestInjectClaudeNeutralWritesResidualPersonaWithoutRegionalLanguage(t *test
 	// Should NOT have gentleman-specific regional language.
 	if strings.Contains(text, "Rioplatense") {
 		t.Fatal("Neutral persona should not contain Rioplatense language")
+	}
+}
+
+func TestInjectNeutralReportsRetiredOutputStyleRemovalFailure(t *testing.T) {
+	home := t.TempDir()
+	retiredPath := filepath.Join(home, ".claude", "output-styles", "gentleman.md")
+	cause := errors.New("retired output style removal failed")
+	calls := 0
+	t.Cleanup(SetRetiredOutputStyleRemoverForTest(func(path string) (bool, error) {
+		calls++
+		if path != retiredPath {
+			t.Fatalf("retired output style path = %q, want %q", path, retiredPath)
+		}
+		return false, cause
+	}))
+
+	_, err := Inject(home, claudeAdapter(), model.PersonaNeutral)
+	if err == nil {
+		t.Fatal("Inject() error = nil, want retired output style removal failure")
+	}
+	var typed *RetiredOutputStyleRemovalError
+	if !errors.As(err, &typed) {
+		t.Fatalf("Inject() error = %v, want RetiredOutputStyleRemovalError", err)
+	}
+	if typed.Path != retiredPath {
+		t.Fatalf("retired output style error path = %q, want %q", typed.Path, retiredPath)
+	}
+	if !errors.Is(err, cause) {
+		t.Fatalf("Inject() error = %v, want cause %v", err, cause)
+	}
+	if calls != 1 {
+		t.Fatalf("retired output style remover calls = %d, want 1", calls)
 	}
 }
 
