@@ -6978,6 +6978,56 @@ func TestClaudeSkillRegistryHookCommandUsesPowerShellSafeWindowsSyntax(t *testin
 	}
 }
 
+func TestEnsureClaudeSkillRegistryHookReplacesLegacyManagedCommand(t *testing.T) {
+	home := t.TempDir()
+	settingsPath := filepath.Join(home, ".claude", "settings.json")
+	if err := os.MkdirAll(filepath.Dir(settingsPath), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	initial := fmt.Sprintf(`{
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "matcher": "",
+        "hooks": [
+          {"type": "command", "command": %q}
+        ]
+      }
+    ]
+  }
+}`, claudeSkillRegistryHookCommandPOSIX)
+	if err := os.WriteFile(settingsPath, []byte(initial), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	changed, err := ensureClaudeSkillRegistryHook(settingsPath)
+	if err != nil {
+		t.Fatalf("ensureClaudeSkillRegistryHook() error = %v", err)
+	}
+	if runtime.GOOS == "windows" && !changed {
+		t.Fatal("Windows migration changed = false, want true")
+	}
+
+	data, err := os.ReadFile(settingsPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(data)
+	if strings.Count(text, "gentle-ai skill-registry refresh") != 1 {
+		t.Fatalf("managed hook count mismatch after migration:\n%s", text)
+	}
+	var root map[string]any
+	if err := json.Unmarshal(data, &root); err != nil {
+		t.Fatalf("decode migrated settings: %v", err)
+	}
+	if !claudeHookExists(root, claudeSkillRegistryHookCommand(runtime.GOOS)) {
+		t.Fatalf("managed hook was not migrated to current command:\n%s", text)
+	}
+	if runtime.GOOS == "windows" && claudeHookExists(root, claudeSkillRegistryHookCommandPOSIX) {
+		t.Fatalf("legacy POSIX hook survived Windows migration:\n%s", text)
+	}
+}
+
 func TestEnsureClaudeSkillRegistryHookAppendsIdempotently(t *testing.T) {
 	home := t.TempDir()
 	settingsPath := filepath.Join(home, ".claude", "settings.json")
